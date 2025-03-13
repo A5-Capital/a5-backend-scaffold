@@ -24,44 +24,25 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "Download complete."
-echo ""
+# Always create a runner script because curl | bash doesn't handle interactive input
+RUNNER_SCRIPT="$HOME/run-a5-feature-generator.sh"
 
-# Check if we're running in a pipe
-if [ -t 0 ]; then
-  # Terminal is interactive, run the script directly
-  echo "Running the feature generator interactively..."
-  $TMP_FILE
-else
-  # We're in a pipe, create a new script to run later
-  RUNNER_SCRIPT="$HOME/run-a5-feature-generator.sh"
-  
-  cat > $RUNNER_SCRIPT << 'EOF'
+cat > $RUNNER_SCRIPT << 'EOF'
 #!/bin/bash
 echo "Running A5 Feature Generator..."
 /tmp/generate-feature.sh
+EXIT_CODE=$?
 rm -f /tmp/generate-feature.sh
 echo "Thank you for using A5 Feature Generator!"
+exit $EXIT_CODE
 EOF
 
-  chmod +x $RUNNER_SCRIPT
-  
-  echo "IMPORTANT: The script cannot run interactively when piped directly to bash."
-  echo "A runner script has been created at: $RUNNER_SCRIPT"
-  echo ""
-  echo "Please run this command to start the interactive feature generator:"
-  echo ""
-  echo "  $RUNNER_SCRIPT"
-  echo ""
-fi
+chmod +x $RUNNER_SCRIPT
 
-# Don't remove the temp file if we created a runner script
-if [ -t 0 ]; then
-  # Clean up when done
-  rm -f $TMP_FILE
-fi
-
-if [ -t 0 ]; then
-  echo ""
-  echo "Installation complete. Thank you for using A5 Feature Generator!"
-fi
+echo "Download complete."
+echo ""
+echo "IMPORTANT: To run the interactive feature generator, please use this command:"
+echo ""
+echo "  $RUNNER_SCRIPT"
+echo ""
+echo "This will allow you to input all required information interactively."
