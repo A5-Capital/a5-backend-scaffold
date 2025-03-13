@@ -25,6 +25,56 @@ print_message() {
   echo -e "${color}${message}${NC}"
 }
 
+# Function to display usage information
+show_usage() {
+  echo -e "Usage: $0 [OPTIONS]"
+  echo -e "Options:"
+  echo -e "  -p, --path PATH     Path to features folder (will be created if it doesn't exist)"
+  echo -e "  -n, --name NAME     Name of the feature to create"
+  echo -e "  -i, --import STYLE  Import style: 1 for relative paths, 2 for alias"
+  echo -e "  -a, --alias ALIAS   Alias prefix (e.g., @/features) when using import style 2"
+  echo -e "  -h, --help          Display this help message"
+  echo -e "\nExample:"
+  echo -e "  $0 --path ./src/features --name user-management --import 2 --alias @/features"
+  echo -e "\nIf options are not provided, you will be prompted for input."
+}
+
+# Parse command line arguments
+FEATURES_BASE_PATH=""
+FEATURE_NAME=""
+IMPORT_STYLE_CHOICE=""
+FEATURES_ALIAS=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -p|--path)
+      FEATURES_BASE_PATH="$2"
+      shift 2
+      ;;
+    -n|--name)
+      FEATURE_NAME="$2"
+      shift 2
+      ;;
+    -i|--import)
+      IMPORT_STYLE_CHOICE="$2"
+      shift 2
+      ;;
+    -a|--alias)
+      FEATURES_ALIAS="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_usage
+      exit 0
+      ;;
+    *)
+      print_message "$RED" "Error: Unknown option $1"
+      show_usage
+      exit 1
+      ;;
+  esac
+done
+
 # Function to create a directory if it doesn't exist
 create_directory() {
   local dir_path=$1
@@ -42,16 +92,18 @@ create_file() {
   print_message "$GREEN" "Created file: $file_path"
 }
 
-# Ask for features folder location
-print_message "$BLUE" "Enter the path to your features folder (absolute or relative):"
-read features_base_path
+# If no path provided via arguments, prompt for it
+if [[ -z "$FEATURES_BASE_PATH" ]]; then
+  print_message "$BLUE" "Enter the path to your features folder (absolute or relative):"
+  read FEATURES_BASE_PATH
+fi
 
 # Verify if the path exists or can be created
-if [ ! -d "$features_base_path" ]; then
+if [ ! -d "$FEATURES_BASE_PATH" ]; then
   print_message "$YELLOW" "Directory doesn't exist. Do you want to create it? (y/n)"
   read create_dir
   if [[ $create_dir == "y" || $create_dir == "Y" ]]; then
-    mkdir -p "$features_base_path"
+    mkdir -p "$FEATURES_BASE_PATH"
     if [ $? -ne 0 ]; then
       print_message "$RED" "Failed to create directory. Please check the path and permissions."
       exit 1
@@ -63,34 +115,40 @@ if [ ! -d "$features_base_path" ]; then
   fi
 fi
 
-# Ask for import style
-print_message "$BLUE" "How do you want to make imports? Choose an option:"
-print_message "$BLUE" "1. Relative paths (e.g., ../../../features/featureName)"
-print_message "$BLUE" "2. Alias (e.g., @/features/featureName)"
-read import_style_choice
-
-if [ "$import_style_choice" == "2" ]; then
-  print_message "$BLUE" "Enter your alias for the features folder (e.g., @/features):"
-  read features_alias
-  
-  # Remove trailing slash if present
-  features_alias=${features_alias%/}
-else
-  features_alias=""
+# If no import style provided via arguments, prompt for it
+if [[ -z "$IMPORT_STYLE_CHOICE" ]]; then
+  print_message "$BLUE" "How do you want to make imports? Choose an option:"
+  print_message "$BLUE" "1. Relative paths (e.g., ../../../features/featureName)"
+  print_message "$BLUE" "2. Alias (e.g., @/features/featureName)"
+  read IMPORT_STYLE_CHOICE
 fi
 
-# Ask for feature name
-print_message "$BLUE" "Enter the name of the feature you want to create:"
-read feature_name
+if [ "$IMPORT_STYLE_CHOICE" == "2" ]; then
+  if [[ -z "$FEATURES_ALIAS" ]]; then
+    print_message "$BLUE" "Enter your alias for the features folder (e.g., @/features):"
+    read FEATURES_ALIAS
+  fi
+  
+  # Remove trailing slash if present
+  FEATURES_ALIAS=${FEATURES_ALIAS%/}
+else
+  FEATURES_ALIAS=""
+fi
+
+# If no feature name provided via arguments, prompt for it
+if [[ -z "$FEATURE_NAME" ]]; then
+  print_message "$BLUE" "Enter the name of the feature you want to create:"
+  read FEATURE_NAME
+fi
 
 # Validate feature name
-if [ -z "$feature_name" ]; then
+if [ -z "$FEATURE_NAME" ]; then
   print_message "$RED" "Feature name cannot be empty. Exiting."
   exit 1
 fi
 
 # Create feature directory structure
-feature_path="$features_base_path/$feature_name"
+feature_path="$FEATURES_BASE_PATH/$FEATURE_NAME"
 create_directory "$feature_path"
 
 # Define the structure of a feature
@@ -122,16 +180,16 @@ to_pascal_case() {
 }
 
 # Prepare import paths based on choice
-if [ "$import_style_choice" == "2" ]; then
-  import_path="$features_alias/$feature_name"
+if [ "$IMPORT_STYLE_CHOICE" == "2" ]; then
+  import_path="$FEATURES_ALIAS/$FEATURE_NAME"
 else
   # Calculate relative path (simplified for this script)
   import_path="../"
 fi
 
 # Convert feature name to different cases
-pascal_feature_name=$(to_pascal_case "$feature_name")
-camel_feature_name=$(to_camel_case "$feature_name")
+pascal_feature_name=$(to_pascal_case "$FEATURE_NAME")
+camel_feature_name=$(to_camel_case "$FEATURE_NAME")
 
 # Determine singular name
 if [[ "$pascal_feature_name" == *s ]]; then
@@ -189,7 +247,7 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { CustomBaseEntity } from '@/shared/entity/customBaseEntity';
 import { I${singular_name}Model } from '$import_path/types';
 
-@Entity({ name: '${feature_name}' })
+@Entity({ name: '${FEATURE_NAME}' })
 export default class ${singular_name}Entity extends CustomBaseEntity implements I${singular_name}Model {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -201,11 +259,11 @@ export default class ${singular_name}Entity extends CustomBaseEntity implements 
 }
 EOF
 )
-create_file "$feature_path/models/${feature_name}.ts" "$model_content"
+create_file "$feature_path/models/${FEATURE_NAME}.ts" "$model_content"
 
 # Generate model index file
 model_index_content=$(cat << EOF
-import ${singular_name}Entity from './${feature_name}';
+import ${singular_name}Entity from './${FEATURE_NAME}';
 
 export { ${singular_name}Entity };
 
@@ -221,7 +279,7 @@ repository_content=$(cat << EOF
 import { DataSource, Repository } from 'typeorm';
 import { inject, singleton } from 'tsyringe';
 import { I${pascal_feature_name}Repository } from '../types/repositories';
-import ${singular_name}Entity from '../models/${feature_name}';
+import ${singular_name}Entity from '../models/${FEATURE_NAME}';
 
 @singleton()
 export default class ${pascal_feature_name}Repository implements I${pascal_feature_name}Repository {
@@ -318,7 +376,7 @@ create_file "$feature_path/schema/index.ts" "$schema_content"
 service_content=$(cat << EOF
 import { singleton } from 'tsyringe';
 import ${pascal_feature_name}Repository from '../repository';
-import ${singular_name}Entity from '../models/${feature_name}';
+import ${singular_name}Entity from '../models/${FEATURE_NAME}';
 
 @singleton()
 export default class ${pascal_feature_name}Service {
@@ -378,11 +436,11 @@ create_file "$feature_path/types/index.ts" "$types_content"
 
 # Generate repository types file
 repository_types_content=$(cat << EOF
-import ${singular_name}Entity from '$import_path/models/${feature_name}';
+import ${singular_name}Entity from '$import_path/models/${FEATURE_NAME}';
 
 export interface I${pascal_feature_name}Repository {
   /**
-   * Gets all ${feature_name}
+   * Gets all ${FEATURE_NAME}
    * @returns Array of ${singular_name} entities
    */
   getAll(): Promise<${singular_name}Entity[]>;
@@ -424,7 +482,7 @@ create_file "$feature_path/types/repositories.ts" "$repository_types_content"
 create_file "$feature_path/lib/index.ts" "// Add your utility functions and helpers here"
 create_file "$feature_path/subscribers/index.ts" "// Add your event subscribers here"
 
-print_message "$GREEN" "Feature \"$feature_name\" generated successfully!"
+print_message "$GREEN" "Feature \"$FEATURE_NAME\" generated successfully!"
 print_message "$YELLOW" "Don't forget to:"
 print_message "$YELLOW" "1. Register your feature's dependencies in your main DI container"
 print_message "$YELLOW" "2. Add your feature's routes to your main Express app"
